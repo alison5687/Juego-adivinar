@@ -41,6 +41,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  final List<int> _numerosIngresados = [];
 
   final List<String> _mensajesIniciales = [
     '🎯 ¿Podrás adivinar el número? (5 intentos)',
@@ -82,6 +83,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       _juegoTerminado = false;
       _juegoPerdido = false;
       _controller.clear();
+      _numerosIngresados.clear();
     });
     _animationController.reset();
     _animationController.forward();
@@ -117,6 +119,11 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
         _mensaje = '⬆️ ¡Más alto! (Te quedan $_intentosRestantes intentos)';
       } else {
         _mensaje = '⬇️ ¡Más bajo! (Te quedan $_intentosRestantes intentos)';
+      }
+      
+      _numerosIngresados.add(adivinanza);
+      if (_numerosIngresados.length > 4) {
+        _numerosIngresados.removeAt(0);
       }
     });
     
@@ -156,244 +163,338 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.indigo.shade50,
-              Colors.white,
-              Colors.indigo.shade50,
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: FadeTransition(
-                opacity: _fadeAnimation,
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Header con animación
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.indigo.withOpacity(0.2),
-                              blurRadius: 20,
-                              spreadRadius: 5,
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.indigo.shade50,
+                  Colors.white,
+                  Colors.indigo.shade50,
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Header con animación
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.indigo.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                TweenAnimationBuilder(
+                                  duration: const Duration(seconds: 2),
+                                  tween: Tween<double>(begin: 0, end: 2 * pi),
+                                  builder: (context, double value, child) {
+                                    return Transform.rotate(
+                                      angle: value,
+                                      child: child,
+                                    );
+                                  },
+                                  child: Icon(
+                                    _juegoPerdido ? Icons.sentiment_dissatisfied : Icons.psychology_alt,
+                                    size: 60,
+                                    color: _juegoPerdido ? Colors.red : Colors.indigo,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 30),
+
+                          // Contenedor del mensaje principal
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: _getMensajeColor().withOpacity(0.2),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              _mensaje,
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                                color: _getMensajeColor(),
+                                height: 1.4,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // Contador de intentos 
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: _intentosRestantes <= 2 ? Colors.red.shade50 : Colors.indigo.shade50,
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(
+                                color: _intentosRestantes <= 2 ? Colors.red.shade200 : Colors.indigo.shade200,
+                                width: 2,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _intentosRestantes <= 2 ? Icons.warning : Icons.hourglass_bottom,
+                                  color: _intentosRestantes <= 2 ? Colors.red : Colors.indigo,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Intentos restantes: $_intentosRestantes',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: _intentosRestantes <= 2 ? Colors.red : Colors.indigo,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // Campo de texto 
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(15),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.indigo.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              controller: _controller,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              enabled: !_juegoTerminado && !_juegoPerdido,
+                              style: const TextStyle(fontSize: 18),
+                              decoration: InputDecoration(
+                                hintText: 'Escribe tu número aquí',
+                                hintStyle: TextStyle(color: Colors.grey.shade400),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                  borderSide: BorderSide.none,
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                prefixIcon: const Icon(Icons.casino, color: Colors.indigo),
+                                suffixIcon: _controller.text.isNotEmpty
+                                    ? IconButton(
+                                        icon: const Icon(Icons.clear, color: Colors.grey),
+                                        onPressed: () => _controller.clear(),
+                                      )
+                                    : null,
+                              ),
+                              onSubmitted: (_) => _verificarAdivinanza(),
+                            ),
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Botón principal 
+                          SizedBox(
+                            width: double.infinity,
+                            height: 60,
+                            child: ElevatedButton(
+                              onPressed: (_juegoTerminado || _juegoPerdido) ? null : _verificarAdivinanza,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _juegoTerminado 
+                                    ? Colors.green 
+                                    : (_juegoPerdido ? Colors.red : Colors.indigo),
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: _juegoTerminado 
+                                    ? Colors.green.shade100 
+                                    : (_juegoPerdido ? Colors.red.shade100 : Colors.indigo.shade100),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                elevation: 5,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _juegoTerminado 
+                                        ? Icons.emoji_events 
+                                        : (_juegoPerdido ? Icons.sentiment_very_dissatisfied : Icons.check_circle_outline)
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    _juegoTerminado 
+                                        ? '¡Felicidades!' 
+                                        : (_juegoPerdido ? 'Perdiste' : 'Adivinar'),
+                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 15),
+
+                          // Botón de reinicio con animación
+                          if (_juegoTerminado || _juegoPerdido)
                             TweenAnimationBuilder(
-                              duration: const Duration(seconds: 2),
-                              tween: Tween<double>(begin: 0, end: 2 * pi),
+                              duration: const Duration(milliseconds: 500),
+                              tween: Tween<double>(begin: 0, end: 1),
                               builder: (context, double value, child) {
-                                return Transform.rotate(
-                                  angle: value,
+                                return Transform.scale(
+                                  scale: value,
                                   child: child,
                                 );
                               },
-                              child: Icon(
-                                _juegoPerdido ? Icons.sentiment_dissatisfied : Icons.psychology_alt,
-                                size: 60,
-                                color: _juegoPerdido ? Colors.red : Colors.indigo,
+                              child: OutlinedButton.icon(
+                                onPressed: _iniciarJuego,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.indigo,
+                                  side: const BorderSide(color: Colors.indigo, width: 2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                                ),
+                                icon: const Icon(Icons.replay),
+                                label: const Text(
+                                  'Jugar de nuevo',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 30),
-
-                      // Contenedor del mensaje principal
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _getMensajeColor().withOpacity(0.2),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          _mensaje,
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w600,
-                            color: _getMensajeColor(),
-                            height: 1.4,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // Contador de intentos 
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _intentosRestantes <= 2 ? Colors.red.shade50 : Colors.indigo.shade50,
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(
-                            color: _intentosRestantes <= 2 ? Colors.red.shade200 : Colors.indigo.shade200,
-                            width: 2,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _intentosRestantes <= 2 ? Icons.warning : Icons.hourglass_bottom,
-                              color: _intentosRestantes <= 2 ? Colors.red : Colors.indigo,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Intentos restantes: $_intentosRestantes',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: _intentosRestantes <= 2 ? Colors.red : Colors.indigo,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // Campo de texto 
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.indigo.withOpacity(0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _controller,
-                          keyboardType: TextInputType.number,
-                          textAlign: TextAlign.center,
-                          enabled: !_juegoTerminado && !_juegoPerdido,
-                          style: const TextStyle(fontSize: 18),
-                          decoration: InputDecoration(
-                            hintText: 'Escribe tu número aquí',
-                            hintStyle: TextStyle(color: Colors.grey.shade400),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(15),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: Colors.white,
-                            prefixIcon: const Icon(Icons.casino, color: Colors.indigo),
-                            suffixIcon: _controller.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear, color: Colors.grey),
-                                    onPressed: () => _controller.clear(),
-                                  )
-                                : null,
-                          ),
-                          onSubmitted: (_) => _verificarAdivinanza(),
-                        ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Botón principal 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 60,
-                        child: ElevatedButton(
-                          onPressed: (_juegoTerminado || _juegoPerdido) ? null : _verificarAdivinanza,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _juegoTerminado 
-                                ? Colors.green 
-                                : (_juegoPerdido ? Colors.red : Colors.indigo),
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: _juegoTerminado 
-                                ? Colors.green.shade100 
-                                : (_juegoPerdido ? Colors.red.shade100 : Colors.indigo.shade100),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                            elevation: 5,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _juegoTerminado 
-                                    ? Icons.emoji_events 
-                                    : (_juegoPerdido ? Icons.sentiment_very_dissatisfied : Icons.check_circle_outline)
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                _juegoTerminado 
-                                    ? '¡Felicidades!' 
-                                    : (_juegoPerdido ? 'Perdiste' : 'Adivinar'),
-                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 15),
-
-                      // Botón de reinicio con animación
-                      if (_juegoTerminado || _juegoPerdido)
-                        TweenAnimationBuilder(
-                          duration: const Duration(milliseconds: 500),
-                          tween: Tween<double>(begin: 0, end: 1),
-                          builder: (context, double value, child) {
-                            return Transform.scale(
-                              scale: value,
-                              child: child,
-                            );
-                          },
-                          child: OutlinedButton.icon(
-                            onPressed: _iniciarJuego,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.indigo,
-                              side: const BorderSide(color: Colors.indigo, width: 2),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-                            ),
-                            icon: const Icon(Icons.replay),
-                            label: const Text(
-                              'Jugar de nuevo',
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
+          // ListView flotante en esquina izquierda
+          Positioned(
+            left: 10,
+            top: 10,
+            child: SafeArea(
+              child: Container(
+                width: 120,
+                height: 200,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.95),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.indigo.withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.indigo.shade200,
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.indigo.shade50,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(13),
+                          topRight: Radius.circular(13),
+                        ),
+                      ),
+                      child: const Text(
+                        'Últimos #',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Expanded(
+                      child: _numerosIngresados.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Sin números',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade400,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              children: _numerosIngresados
+                                  .asMap()
+                                  .entries
+                                  .map(
+                                    (entry) => Container(
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.indigo.shade100,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        entry.value.toString(),
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.indigo,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
