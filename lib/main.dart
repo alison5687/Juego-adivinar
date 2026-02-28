@@ -39,12 +39,14 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   bool _juegoTerminado = false;
   bool _juegoPerdido = false;
-  late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
+  // late AnimationController _animationController;
+  // late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
-  int? _mejorPuntuacion;
+  final List<int> _numerosIngresados = [];
+  late SharedPreferences _prefs;
+  int _mejorPuntuacion = 999; // Inicializar con un valor alto
 
   final List<String> _mensajesIniciales = [
     '🎯 ¿Podrás adivinar el número? (5 intentos)',
@@ -89,6 +91,14 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       ),
     ]).animate(_bounceController);
     
+    _cargarDatos();
+  }
+
+  Future<void> _cargarDatos() async {
+    _prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _mejorPuntuacion = _prefs.getInt('mejorPuntuacion') ?? 999;
+    });
     _iniciarJuego();
     _loadMejorPuntuacion();
   }
@@ -131,6 +141,7 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
       if (adivinanza == _numeroSecreto) {
         _mensaje = '🎉 ¡CORRECTO! 🎉\nLo lograste en $_intentos ${_intentos == 1 ? 'intento' : 'intentos'}';
         _juegoTerminado = true;
+        _guardarPuntuacion();
       } else if (_intentosRestantes == 0) {
         _mensaje = '😢 ¡GAME OVER! 😢\nEl número secreto era $_numeroSecreto';
         _juegoPerdido = true;
@@ -184,6 +195,16 @@ class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  void _guardarPuntuacion() {
+    if (_intentos < _mejorPuntuacion) {
+      setState(() {
+        _mejorPuntuacion = _intentos;
+      });
+      _prefs.setInt('mejorPuntuacion', _intentos);
+      _mostrarMensajeTemporal('🏆 ¡Nuevo récord! $_intentos intentos', Colors.green);
+    }
   }
 
   Color _getMensajeColor() {
@@ -362,8 +383,39 @@ void _darPista() {
                           textAlign: TextAlign.center,
                         ),
                       ),
-
                       const SizedBox(height: 30),
+                          // Récord actual
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(
+                                color: Colors.amber.shade200,
+                                width: 2,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.emoji_events,
+                                  color: Colors.amber,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Récord: ${_mejorPuntuacion == 999 ? '---' : _mejorPuntuacion} intentos',
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
 
                       // Contador de intentos 
                       Container(
