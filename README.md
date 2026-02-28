@@ -10,6 +10,7 @@ Una aplicación móvil desarrollada con **Flutter** que implementa un juego inte
 - **Pistas inteligentes**: La app proporciona retroalimentación indicando si el número es mayor o menor
 - **Validación de entrada**: Solo acepta números entre 1 y 100
 - **Estados del juego**: Victoria, derrota, y estados intermedios con mensajes dinámicos
+- **Botón de Pista (NUEVO)**: Solicita pistas sobre la paridad o rango del número, cuesta 1 intento
 
 ### 🏆 Sistema de Puntuación (NUEVO)
 - **Almacenamiento persistente**: Usa `SharedPreferences` para guardar el mejor récord
@@ -28,22 +29,165 @@ Una aplicación móvil desarrollada con **Flutter** que implementa un juego inte
 ## 🎨 Interfaz de Usuario
 
 ### Componentes principales
-1. **Encabezado animado**: Icono giratorio que cambia según el estado del juego
-2. **Mensaje principal**: Comunica el estado actual, pistas y resultado
-3. **Contador de intentos**: Muestra los intentos restantes con color dinámico (rojo si quedan ≤2)
-4. **Récord actual**: Panel que muestra el mejor puntaje logrado
-5. **Campo de entrada**: TextField decorado para ingresar números
-6. **Botón de acción**: Cambia de estado según el progreso (Adivinar → Felicidades/Perdiste)
-7. **Botón de reinicio**: Aparece al finalizar para jugar nuevamente
-8. **ListView flotante**: Historial de números intentados en la esquina superior izquierda
+1. **Encabezado animado**: Icono giratorio con efectos de escala que cambia según el estado del juego
+2. **Indicador de Récord**: Muestra el mejor puntaje logrado justo debajo del header (NUEVO)
+3. **Botón de Pista**: Permite solicitar una pista a cambio de 1 intento, con aparición/desaparición animada (NUEVO)
+4. **Mensaje principal**: Comunica el estado actual, pistas y resultado con animación suave de paddings
+5. **Contador de intentos**: Muestra los intentos restantes con color dinámico (rojo si quedan ≤2)
+6. **Campo de entrada**: TextField decorado para ingresar números
+7. **Botón de acción**: Cambia de estado según el progreso (Adivinar → Felicidades/Perdiste)
+8. **Botón de reinicio**: Aparece al finalizar para jugar nuevamente
+9. **ListView flotante**: Historial de números intentados en la esquina superior izquierda
 
 ### Animaciones
 - **Fade-in**: Transición suave al mostrar elementos
 - **Slide**: Movimiento desde arriba hacia abajo
 - **Rotación**: Icono principal gira continuamente
-- **Escalado**: Botón de reinicio se muestra con efecto de zoom
+- **Scale/Bounce**: Icono del header rebota suavemente (NUEVO)
+- **AnimatedContainer**: Mensaje principal anima cambios de padding (NUEVO)
+- **AnimatedSwitcher**: Botón de pista aparece/desaparece suavemente (NUEVO)
 
 ## 🔧 Cambios Realizados al Código
+
+### Cambios Recientes (Actualización v2.0)
+
+#### 1. **Actualización del Mixin de Animaciones**
+Se cambió de `SingleTickerProviderStateMixin` a `TickerProviderStateMixin` para soportar múltiples controladores de animación simultáneamente:
+```dart
+// Antes:
+class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
+
+// Ahora:
+class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
+```
+
+#### 2. **Mejora del Sistema de Puntuación con int?**
+```dart
+// Antes:
+int _mejorPuntuacion = 999; // Inicializar con un valor alto
+
+// Ahora:
+int? _mejorPuntuacion; // Uso de null safety para mejor validación
+```
+Esta mejora permite una validación más precisa: `null` significa que aún no hay récord, evitando confusiones.
+
+#### 3. **Refactorización de Métodos de SharedPreferences**
+Se separaron las responsabilidades en múltiples métodos:
+```dart
+Future<void> _loadMejorPuntuacion() async {
+  final int? valor = _prefs.getInt('mejorPuntuacion');
+  setState(() {
+    _mejorPuntuacion = valor;
+  });
+}
+
+Future<void> _guardarMejorPuntuacion(int intentos) async {
+  _prefs.setInt('mejorPuntuacion', intentos);
+  setState(() {
+    _mejorPuntuacion = intentos;
+  });
+}
+
+Future<void> _guardarMejorPuntuacionSiNecesario() async {
+  if (_mejorPuntuacion == null || _intentos < _mejorPuntuacion!) {
+    await _guardarMejorPuntuacion(_intentos);
+    _mostrarMensajeTemporal('🏆 Nuevo récord: $_intentos intentos', Colors.green);
+  }
+}
+```
+
+#### 4. **Nuevo Botón de Pista Interactivo**
+Se agregó un botón dinámico que permite al usuario pedir una pista a cambio de 1 intento:
+```dart
+AnimatedSwitcher(
+  duration: const Duration(milliseconds: 300),
+  child: (!_juegoTerminado && !_juegoPerdido && _intentosRestantes > 1)
+      ? Container(
+          key: const ValueKey('pista_button'),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [...],
+          ),
+          child: TextButton.icon(
+            onPressed: _darPista,
+            icon: const Icon(Icons.lightbulb, color: Colors.orange),
+            label: const Text('¿Necesitas una pista? (-1 intento)', 
+              style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+          ),
+        )
+      : SizedBox.shrink(key: ValueKey('pista_empty')),
+),
+```
+**Características:**
+- Solo aparece cuando hay más de 1 intento restante
+- Se oculta automáticamente al ganar o perder
+- Animación suave de aparición/desaparición con `AnimatedSwitcher`
+- Pistas aleatorias: paridad del número o si es mayor/menor a 50
+
+#### 5. **Animación Mejorada del Mensaje Principal**
+Se cambió de `Container` estático a `AnimatedContainer` para animar cambios de tamaño:
+```dart
+// Antes:
+Container(
+  padding: const EdgeInsets.all(20),
+  decoration: BoxDecoration(...),
+  child: Text(_mensaje, ...)
+)
+
+// Ahora:
+AnimatedContainer(
+  duration: const Duration(milliseconds: 300),
+  curve: Curves.easeInOut,
+  padding: (_juegoTerminado || _juegoPerdido) 
+      ? const EdgeInsets.all(28) 
+      : const EdgeInsets.all(20),
+  decoration: BoxDecoration(...),
+  child: Text(_mensaje, ...)
+)
+```
+El padding aumenta suavemente cuando se gana o pierde, brindando mayor énfasis visual.
+
+#### 6. **Animación de Escala en el Icono del Header**
+El icono principal ahora tiene animación de rebote:
+```dart
+ScaleTransition(
+  scale: _bounceAnimation,
+  child: Container(
+    // ... icono giratorio
+  ),
+)
+```
+Proporciona una experiencia visual más dinámica.
+
+#### 7. **Muestra del Récord en la Parte Superior**
+Se agregó visualización del récord actual justo debajo del header:
+```dart
+if (_mejorPuntuacion != null)
+  Padding(
+    padding: const EdgeInsets.only(top: 8.0),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.emoji_events, color: Colors.amber, size: 20),
+        const SizedBox(width: 6),
+        Text(
+          'Récord: $_mejorPuntuacion ${_mejorPuntuacion == 1 ? 'intento' : 'intentos'}',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Colors.indigo.shade700,
+          ),
+        ),
+      ],
+    ),
+  ),
+```
+
+---
+
+### Cambios Originales de la Versión 1.0
 
 ### 1. **Integración de SharedPreferences**
 ```dart

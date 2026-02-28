@@ -31,7 +31,7 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
+class _MyHomePageState extends State<MyHomePage> with TickerProviderStateMixin {
   late int _numeroSecreto;
   int _intentos = 0;
   int _intentosRestantes = 5; // Límite de 5 intentos
@@ -42,9 +42,11 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late AnimationController _bounceController;
+  late Animation<double> _bounceAnimation;
   final List<int> _numerosIngresados = [];
   late SharedPreferences _prefs;
-  int _mejorPuntuacion = 999; // Inicializar con un valor alto
+  int? _mejorPuntuacion;
 
   final List<String> _mensajesIniciales = [
     '🎯 ¿Podrás adivinar el número? (5 intentos)',
@@ -73,16 +75,36 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       parent: _animationController,
       curve: Curves.easeOutCubic,
     ));
+    _bounceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+
+    _bounceAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.15).chain(CurveTween(curve: Curves.easeOut)),
+        weight: 60,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.15, end: 1.0).chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 40,
+      ),
+    ]).animate(_bounceController);
     
     _cargarDatos();
   }
 
   Future<void> _cargarDatos() async {
     _prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _mejorPuntuacion = _prefs.getInt('mejorPuntuacion') ?? 999;
-    });
+    _loadMejorPuntuacion();
     _iniciarJuego();
+  }
+
+  Future<void> _loadMejorPuntuacion() async {
+    final int? valor = _prefs.getInt('mejorPuntuacion');
+    setState(() {
+      _mejorPuntuacion = valor;
+    });
   }
 
   void _iniciarJuego() {
@@ -97,6 +119,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
       _numerosIngresados.clear();
     });
     _animationController.reset();
+    _bounceController.reset();
     _animationController.forward();
   }
 
@@ -111,7 +134,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
 
     final int? adivinanza = int.tryParse(texto);
     if (adivinanza == null || adivinanza < 1 || adivinanza > 100) {
-      _mostrarMensajeTemporal('⚠️ Solo números entre 1 y 100', Colors.orange);
+      _mostrarMensajeTemporal('⚠️ Solo números entre 1 y 5', Colors.orange);
       return;
     }
 
@@ -157,14 +180,22 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     );
   }
 
-  void _guardarPuntuacion() {
-    if (_intentos < _mejorPuntuacion) {
-      setState(() {
-        _mejorPuntuacion = _intentos;
-      });
-      _prefs.setInt('mejorPuntuacion', _intentos);
-      _mostrarMensajeTemporal('🏆 ¡Nuevo récord! $_intentos intentos', Colors.green);
+  Future<void> _guardarMejorPuntuacion(int intentos) async {
+    _prefs.setInt('mejorPuntuacion', intentos);
+    setState(() {
+      _mejorPuntuacion = intentos;
+    });
+  }
+
+  Future<void> _guardarMejorPuntuacionSiNecesario() async {
+    if (_mejorPuntuacion == null || _intentos < _mejorPuntuacion!) {
+      await _guardarMejorPuntuacion(_intentos);
+      _mostrarMensajeTemporal('🏆 Nuevo récord: $_intentos intentos', Colors.green);
     }
+  }
+
+  void _guardarPuntuacion() {
+    _guardarMejorPuntuacionSiNecesario();
   }
 
   Color _getMensajeColor() {
@@ -175,10 +206,28 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     return Colors.indigo;
   }
 
+void _darPista() {
+  if (_juegoTerminado || _juegoPerdido || _intentosRestantes <=1) return;
+  
+  setState(() {
+    _intentos++;
+    _intentosRestantes--;
+
+  
+  final random = Random();
+  String pista = "";
+  if (random.nextBool()) {
+    pista = _numeroSecreto % 2 == 0 ? "El número es par (-1 intento)" : "El número es impar (-1 intento)";
+  } else {
+    pista = _numeroSecreto > 50 ? "El número es mayor que 50 (-1 intento)" : "El número es menor o igual a 50 (-1 intento)";  }
+  _mostrarMensajeTemporal(pista, Colors.amber.shade900);});
+  }
+
   @override
   void dispose() {
     _controller.dispose();
     _animationController.dispose();
+    _bounceController.dispose();
     super.dispose();
   }
 
@@ -211,7 +260,9 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           // Header con animación
-                          Container(
+                          ScaleTransition(
+                            scale: _bounceAnimation,
+                            child: Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -245,11 +296,64 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                               ],
                             ),
                           ),
+                          ),
+
+                          if (_mejorPuntuacion != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.emoji_events, color: Colors.amber, size: 20),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Récord: $_mejorPuntuacion ${_mejorPuntuacion == 1 ? 'intento' : 'intentos'}',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.indigo.shade700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           const SizedBox(height: 30),
 
-                          // Contenedor del mensaje principal
-                          Container(
-                            padding: const EdgeInsets.all(20),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: (!_juegoTerminado && !_juegoPerdido && _intentosRestantes > 1)
+                                ? Container(
+                                    key: const ValueKey('pista_button'),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.15),
+                                          blurRadius: 12,
+                                          spreadRadius: 1,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: TextButton.icon(
+                                      onPressed: _darPista,
+                                      icon: const Icon(Icons.lightbulb, color: Colors.orange),
+                                      label: const Text('¿Necesitas una pista? (-1 intento)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.orange,
+                                      ),
+                                    ),
+                                  )
+                                : SizedBox.shrink(key: ValueKey('pista_empty')),
+                          ),
+
+                          // Contenedor del mensaje principal (ahora animado)
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                            padding: (_juegoTerminado || _juegoPerdido) ? const EdgeInsets.all(28) : const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(20),
@@ -300,39 +404,6 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: _intentosRestantes <= 2 ? Colors.red : Colors.indigo,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Récord actual
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.amber.shade50,
-                              borderRadius: BorderRadius.circular(30),
-                              border: Border.all(
-                                color: Colors.amber.shade200,
-                                width: 2,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.emoji_events,
-                                  color: Colors.amber,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Récord: ${_mejorPuntuacion == 999 ? '---' : _mejorPuntuacion} intentos',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber,
                                   ),
                                 ),
                               ],
